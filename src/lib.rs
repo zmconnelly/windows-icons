@@ -2,11 +2,16 @@ use base64::engine::general_purpose;
 use base64::Engine as _;
 use image::RgbaImage;
 use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::mem::{self, MaybeUninit};
 use std::os::windows::ffi::OsStrExt;
+use std::os::windows::ffi::OsStringExt;
 use std::ptr;
 use windows::core::PCWSTR;
+use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Graphics::Gdi::GetObjectW;
+use windows::Win32::System::ProcessStatus::K32GetModuleFileNameExW;
+use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON};
 use windows::Win32::{
     Foundation::HWND,
@@ -106,11 +111,48 @@ unsafe fn icon_to_image(icon: HICON) -> RgbaImage {
     })
 }
 
+pub fn get_process_path(process_id: u32) -> Result<String, windows::core::Error> {
+    unsafe {
+        let process_handle = OpenProcess(
+            PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            false,
+            process_id,
+        )?;
+        let mut buffer = vec![0u16; 1024];
+        let size = K32GetModuleFileNameExW(HANDLE(process_handle.0), None, &mut buffer);
+        CloseHandle(process_handle).unwrap();
+
+        if size == 0 {
+            return Err(windows::core::Error::from_win32());
+        }
+
+        buffer.truncate(size as usize);
+        let path = OsString::from_wide(&buffer).into_string().map_err(|_| {
+            windows::core::Error::new(
+                windows::core::HRESULT(-1),
+                "Invalid Unicode in path".to_string(),
+            )
+        })?;
+
+        Ok(path)
+    }
+}
+
+pub fn get_icon_image_by_process_id(process_id: u32) -> RgbaImage {
+    let path = get_process_path(process_id).unwrap();
+    get_icon_image_by_path(&path)
+}
+
 pub fn get_icon_image_by_path(path: &str) -> RgbaImage {
     unsafe {
         let icon = get_hicon(path);
         icon_to_image(icon)
     }
+}
+
+pub fn get_icon_base64_by_process_id(process_id: u32) -> String {
+    let path = get_process_path(process_id).unwrap();
+    get_icon_base64_by_path(&path)
 }
 
 pub fn get_icon_base64_by_path(path: &str) -> String {
