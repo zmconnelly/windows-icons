@@ -1,0 +1,23 @@
+[package]
+name = "windows-icons"
+description = "A simple library to extract icons from files on Windows"
+version = "0.1.0"
+authors = ["Zach Connelly"]
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+image = "0.25"
+base64 = "0.22.1"
+winapi = { version = "0.3.9", features = ["shellapi"] }
+
+[dependencies.windows]
+version = "0.58"
+features = [
+    "Win32_UI",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_Storage_FileSystem",
+]
