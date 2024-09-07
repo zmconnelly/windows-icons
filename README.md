@@ -23,11 +23,6 @@ windows-icons = "0.1.0"
 Here are some examples of how to use the Windows Icons library:
 
 ```rust
-use windows_icons::{
-get_icon_base64_by_path, get_icon_base64_by_process_id,
-get_icon_image_by_path, get_icon_image_by_process_id,
-};
-
 // Get icon as an image from a file path
 let icon = get_icon_image_by_path("C:\\Windows\\System32\\notepad.exe");
 icon.save("notepad.png").unwrap();
@@ -38,6 +33,7 @@ println!("Calculator icon: {}", base64);
 
 // Get icon as an image from a process ID
 let process_id = 1234;
+
 let icon = get_icon_image_by_process_id(process_id);
 icon.save("process.png").unwrap();
 
