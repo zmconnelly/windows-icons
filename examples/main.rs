@@ -1,18 +1,18 @@
 use windows_icons::{
-    get_icon_base64_by_path, get_icon_base64_by_process_id, get_icon_image_by_path,
-    get_icon_image_by_process_id,
+    get_icon_base64_by_path, get_icon_base64_by_process_id, get_icon_by_path,
+    get_icon_by_process_id,
 };
 
 fn main() {
     let _ = std::fs::create_dir("output");
 
-    let icon = get_icon_image_by_path("C:\\Windows\\System32\\notepad.exe");
+    let icon = get_icon_by_path("C:\\Windows\\System32\\notepad.exe");
     icon.save("output/notepad.png").unwrap();
 
-    let icon = get_icon_image_by_path("C:\\Windows\\System32\\calc.exe");
+    let icon = get_icon_by_path("C:\\Windows\\System32\\calc.exe");
     icon.save("output/calc.png").unwrap();
 
-    let icon = get_icon_image_by_path("C:\\Windows\\System32\\cmd.exe");
+    let icon = get_icon_by_path("C:\\Windows\\System32\\cmd.exe");
     icon.save("output/cmd.png").unwrap();
 
     let base64 = get_icon_base64_by_path("C:\\Windows\\System32\\notepad.exe");
@@ -30,6 +30,6 @@ fn main() {
     let base64 = get_icon_base64_by_process_id(process_id);
     println!("Process {}: {}", process_id, base64);
 
-    let icon = get_icon_image_by_process_id(process_id);
+    let icon = get_icon_by_process_id(process_id);
     icon.save("output/process.png").unwrap();
 }
