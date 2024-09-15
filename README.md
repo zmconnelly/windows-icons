@@ -15,7 +15,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-windows-icons = "0.1.0"
+windows-icons = "0.1.1"
 ```
 
 ## Usage
