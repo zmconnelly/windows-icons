@@ -25,7 +25,7 @@ fn main() {
     println!("Cmd: {}", base64);
 
     // Substitute the process id to test
-    let process_id = 1234;
+    let process_id = 0000;
 
     let base64 = get_icon_base64_by_process_id(process_id);
     println!("Process {}: {}", process_id, base64);
