@@ -1,5 +1,6 @@
 name: Publish to crates.io
 
+# Triggered by `cargo release … -x`, which pushes a v* tag.
 on:
   push:
     tags:
@@ -10,14 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      
+        uses: actions/checkout@v4
+
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          override: true
-      
+
       - name: Publish to crates.io
         uses: katyo/publish-crates@v2
         with:
