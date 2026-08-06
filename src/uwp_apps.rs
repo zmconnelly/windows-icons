@@ -56,16 +56,16 @@ fn get_icon_file_path(app_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
         )));
     }
 
-    let package_folder = app_path.parent().ok_or_else(|| {
+    let package_folder = package_folder_from_path(app_path).ok_or_else(|| {
         io::Error::new(
             ErrorKind::NotFound,
-            format!("failed to get parent directory: {app_path:?}"),
+            format!("failed to get UWP package directory: {app_path:?}"),
         )
     })?;
 
     let manifest_path = package_folder.join("AppxManifest.xml");
     if !manifest_path.exists() {
-        return fuzzy_get_icon_file_path(package_folder).map_err(|e| {
+        return fuzzy_get_icon_file_path(&package_folder).map_err(|e| {
             Box::new(io::Error::other(format!(
                 "AppxManifest.xml does not exist and {e}"
             ))) as Box<dyn Error>
@@ -79,8 +79,29 @@ fn get_icon_file_path(app_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
     if icon_full_path.exists() {
         Ok(icon_full_path)
     } else {
-        find_matching_logo_file(&icon_full_path, package_folder)
+        find_matching_logo_file(&icon_full_path, &package_folder)
     }
+}
+
+/// Finds the package root for nested UWP executables.
+fn package_folder_from_path(app_path: &Path) -> Option<PathBuf> {
+    let mut package_folder = PathBuf::new();
+    let mut windows_apps_found = false;
+
+    for component in app_path.components() {
+        package_folder.push(component.as_os_str());
+
+        if windows_apps_found {
+            return Some(package_folder);
+        }
+
+        windows_apps_found = component
+            .as_os_str()
+            .to_string_lossy()
+            .eq_ignore_ascii_case("WindowsApps");
+    }
+
+    None
 }
 
 fn extract_icon_path(manifest_content: &str) -> Result<String, Box<dyn Error>> {
@@ -183,8 +204,8 @@ fn largest_matching_file(
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_icon_path, is_uwp_app};
-    use std::path::Path;
+    use super::{extract_icon_path, is_uwp_app, package_folder_from_path};
+    use std::path::{Path, PathBuf};
 
     fn is_uwp(path: &str) -> bool {
         is_uwp_app(Path::new(path))
@@ -231,6 +252,20 @@ mod tests {
     fn ignores_regular_executables() {
         assert!(!is_uwp(r"C:\Windows\System32\notepad.exe"));
         assert!(!is_uwp(r"C:\Program Files\Git\bin\git.exe"));
+    }
+
+    #[test]
+    fn finds_package_folder_for_nested_executables() {
+        let app_path = Path::new(
+            r"C:\Program Files\WindowsApps\Microsoft.WindowsNotepad_1.0.0.0_x64__8wekyb3d8bbwe\Notepad\Notepad.exe",
+        );
+
+        assert_eq!(
+            package_folder_from_path(app_path),
+            Some(PathBuf::from(
+                r"C:\Program Files\WindowsApps\Microsoft.WindowsNotepad_1.0.0.0_x64__8wekyb3d8bbwe"
+            ))
+        );
     }
 
     #[test]
