@@ -1,5 +1,5 @@
 # cargo-release: bump → commit → tag → push
-# crates.io publish is handled by .github/workflows/publish.yml on v* tags.
+# crates.io publish: .github/workflows/publish.yml on v* tags (Trusted Publishing / OIDC).
 #
 # Usage (from main, clean tree):
 #   cargo release patch|minor|major        # dry-run
