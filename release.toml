@@ -1,0 +1,20 @@
+# cargo-release: bump → commit → tag → push
+# crates.io publish: .github/workflows/publish.yml on v* tags (Trusted Publishing / OIDC).
+#
+# Usage (from main, clean tree):
+#   cargo release patch|minor|major        # dry-run
+#   cargo release patch|minor|major -x     # execute
+
+allow-branch = ["main"]
+
+publish = false
+push = true
+tag = true
+
+pre-release-commit-message = "chore: Release {{crate_name}} v{{version}}"
+tag-name = "v{{version}}"
+tag-message = "{{crate_name}} {{version}}"
+
+pre-release-replacements = [
+  { file = "README.md", search = "windows-icons = .*", replace = "windows-icons = \"{{version}}\"" },
+]
