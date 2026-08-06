@@ -1,17 +1,19 @@
 name: Publish to crates.io
 
-# Triggered by `cargo release … -x`, which pushes a v* tag.
+# Triggered by `cargo release … -x` (v* tag) or manually via workflow_dispatch.
 # Auth: crates.io Trusted Publishing (OIDC) — no CARGO_REGISTRY_TOKEN secret.
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   publish:
     runs-on: windows-latest
     permissions:
       id-token: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
