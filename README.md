@@ -13,14 +13,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-windows-icons = "0.2.1"
+windows-icons = "0.3"
 ```
 
 ## Usage
 
 ```rust
 // Get icon as an image from a file path
-let icon = get_icon_image_by_path("C:\\Windows\\System32\\notepad.exe").unwrap();
+let icon = get_icon_by_path("C:\\Windows\\System32\\notepad.exe").unwrap();
 icon.save("notepad.png").unwrap();
 
 // Get icon as a base64 string from a file path
@@ -40,7 +40,7 @@ println!("Explorer: {}", base64);
 // Get icon as an image from a process ID
 let process_id = 1234;
 
-let icon = get_icon_image_by_process_id(process_id).unwrap();
+let icon = get_icon_by_process_id(process_id).unwrap();
 icon.save("process.png").unwrap();
 
 // Get icon as a base64 encoded string from a process ID
@@ -50,11 +50,15 @@ println!("Process {} icon: {}", process_id, base64);
 
 For more examples, check the [`examples`](examples).
 
-`Cargo run --example icon`
+`cargo run --example icon`
 
-`Cargo run --example process`
+`cargo run --example process -- <process id>`
 
-`Cargo run --example dll`
+`cargo run --example dll`
+
+The `process` example is the easiest way to check a UWP app, since the install folder
+under `WindowsApps` is not readable without elevation: start the app, then pass its
+process id.
 
 ## Requirements
 
