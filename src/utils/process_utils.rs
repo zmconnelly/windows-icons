@@ -25,7 +25,7 @@ pub fn get_process_path(process_id: u32) -> Result<PathBuf, windows::core::Error
         })?;
 
         if size == 0 {
-            return Err(windows::core::Error::from_win32());
+            return Err(windows::core::Error::from_thread());
         }
 
         buffer.truncate(size as usize);

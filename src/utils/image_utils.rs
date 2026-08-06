@@ -75,7 +75,7 @@ unsafe fn get_hicon(file_path: &Path) -> Result<HICON, Box<dyn Error>> {
     };
 
     if result == 0 {
-        let last_error = windows::core::Error::from_win32();
+        let last_error = windows::core::Error::from_thread();
         return Err(Box::new(io::Error::other(format!(
             "failed to get hIcon for the file: {file_path:?}: {last_error}."
         ))));
@@ -162,7 +162,7 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
         )
     };
     if result == 0 {
-        let last_error = windows::core::Error::from_win32();
+        let last_error = windows::core::Error::from_thread();
         return Err(Box::new(io::Error::other(format!(
             "GetDIBits failed: {last_error}."
         ))));
