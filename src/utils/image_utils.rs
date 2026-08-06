@@ -3,7 +3,7 @@ use std::{
     ffi::OsStr,
     fs::File,
     io::{self, Read},
-    mem::{self, MaybeUninit},
+    mem::MaybeUninit,
     os::windows::ffi::OsStrExt,
     path::Path,
 };
@@ -13,47 +13,19 @@ use image::RgbaImage;
 use windows::{
     Win32::{
         Graphics::Gdi::{
-            BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, DeleteObject, GetDC,
-            GetDIBits, GetObjectW, HBITMAP, HDC, HGDIOBJ, ReleaseDC,
+            BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, GetDC, GetDIBits,
+            GetObjectW, HGDIOBJ,
         },
         Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES,
         UI::{
             Shell::{SHFILEINFOW, SHGFI_ICON, SHGetFileInfoW},
-            WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON},
+            WindowsAndMessaging::{GetIconInfo, HICON},
         },
     },
     core::PCWSTR,
 };
 
-struct AutoDc(HDC);
-
-impl Drop for AutoDc {
-    fn drop(&mut self) {
-        if !self.0.0.is_null() {
-            let _ = unsafe { ReleaseDC(None, self.0) };
-        }
-    }
-}
-
-struct AutoBitmap(HBITMAP);
-
-impl Drop for AutoBitmap {
-    fn drop(&mut self) {
-        if !self.0.0.is_null() {
-            let _ = unsafe { DeleteObject(HGDIOBJ::from(self.0)) };
-        }
-    }
-}
-
-struct AutoIcon(HICON);
-
-impl Drop for AutoIcon {
-    fn drop(&mut self) {
-        if !self.0.0.is_null() {
-            let _ = unsafe { DestroyIcon(self.0) };
-        }
-    }
-}
+use crate::utils::guards::{AutoBitmap, AutoDc, AutoIcon};
 
 pub fn get_hicon_to_image(file_path: &Path) -> Result<RgbaImage, Box<dyn Error>> {
     let hicon = unsafe { get_hicon(file_path) }?;
@@ -69,7 +41,7 @@ unsafe fn get_hicon(file_path: &Path) -> Result<HICON, Box<dyn Error>> {
             PCWSTR::from_raw(wide_path.as_ptr()),
             FILE_FLAGS_AND_ATTRIBUTES(0),
             Some(shfileinfo.as_mut_ptr()),
-            std::mem::size_of::<SHFILEINFOW>() as u32,
+            size_of::<SHFILEINFOW>() as u32,
             SHGFI_ICON,
         )
     };
@@ -77,7 +49,7 @@ unsafe fn get_hicon(file_path: &Path) -> Result<HICON, Box<dyn Error>> {
     if result == 0 {
         let last_error = windows::core::Error::from_thread();
         return Err(Box::new(io::Error::other(format!(
-            "failed to get hIcon for the file: {file_path:?}: {last_error}."
+            "failed to get hIcon for {file_path:?}: {last_error}"
         ))));
     }
 
@@ -87,8 +59,8 @@ unsafe fn get_hicon(file_path: &Path) -> Result<HICON, Box<dyn Error>> {
 }
 
 pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
-    let bitmap_size_i32 = i32::try_from(mem::size_of::<BITMAP>())?;
-    let biheader_size_u32 = u32::try_from(mem::size_of::<BITMAPINFOHEADER>())?;
+    let bitmap_size_i32 = i32::try_from(size_of::<BITMAP>())?;
+    let biheader_size_u32 = u32::try_from(size_of::<BITMAPINFOHEADER>())?;
 
     let mut info = MaybeUninit::uninit();
     unsafe {
@@ -97,8 +69,8 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
     }?;
     let info = unsafe { info.assume_init() };
 
-    let _hbm_mask = AutoBitmap(info.hbmMask);
-    let _hbm_color = AutoBitmap(info.hbmColor);
+    let _mask_guard = AutoBitmap(info.hbmMask);
+    let _color_guard = AutoBitmap(info.hbmColor);
     let _icon_guard = AutoIcon(icon);
 
     let mut bitmap: MaybeUninit<BITMAP> = MaybeUninit::uninit();
@@ -122,11 +94,11 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
     let height_usize = usize::try_from(height_u32)?;
     let expected_lines = i32::try_from(height_u32)?;
 
-    let buf_size = width_usize
+    let pixel_count = width_usize
         .checked_mul(height_usize)
-        .ok_or_else(|| io::Error::other("Buffer size overflow"))?;
+        .ok_or_else(|| io::Error::other("buffer size overflow"))?;
 
-    let mut buf = vec![0u32; buf_size];
+    let mut buf = vec![0u32; pixel_count];
 
     let dc = unsafe { GetDC(None) };
     if dc.0.is_null() {
@@ -138,6 +110,7 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
         bmiHeader: BITMAPINFOHEADER {
             biSize: biheader_size_u32,
             biWidth: bitmap.bmWidth,
+            // Negative height asks for a top-down image, matching RgbaImage's row order.
             biHeight: -bitmap.bmHeight,
             biPlanes: 1,
             biBitCount: 32,
@@ -164,7 +137,7 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
     if result == 0 {
         let last_error = windows::core::Error::from_thread();
         return Err(Box::new(io::Error::other(format!(
-            "GetDIBits failed: {last_error}."
+            "GetDIBits failed: {last_error}"
         ))));
     } else if result != expected_lines {
         return Err(Box::new(io::Error::other(format!(
@@ -173,7 +146,7 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
     }
 
     let pixel_data = unsafe {
-        std::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * mem::size_of::<u32>())
+        std::slice::from_raw_parts(buf.as_ptr().cast::<u8>(), buf.len() * size_of::<u32>())
     };
 
     // BGRA -> RGBA
@@ -183,7 +156,7 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
         .collect::<Vec<_>>();
 
     RgbaImage::from_raw(width_u32, height_u32, rgba_data)
-        .ok_or_else(|| "the container(rgba_data) is not big enough".into())
+        .ok_or_else(|| "pixel data does not match the icon dimensions".into())
 }
 
 fn read_icon_file(icon_path: &Path) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -196,7 +169,7 @@ fn read_icon_file(icon_path: &Path) -> Result<Vec<u8>, Box<dyn Error>> {
 pub fn icon_file_to_image(icon_path: &Path) -> Result<RgbaImage, Box<dyn Error>> {
     let buffer = read_icon_file(icon_path)?;
     let image = image::load_from_memory(&buffer)
-        .map_err(|e| io::Error::other(format!("Image decode failed: {e}")))?;
+        .map_err(|e| io::Error::other(format!("image decode failed: {e}")))?;
     Ok(image.to_rgba8())
 }
 

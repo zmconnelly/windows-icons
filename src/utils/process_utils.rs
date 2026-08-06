@@ -1,36 +1,29 @@
 use std::{ffi::OsString, os::windows::ffi::OsStringExt, path::PathBuf};
 
-use windows::Win32::{
-    Foundation::{CloseHandle, HANDLE},
-    System::{
-        ProcessStatus::K32GetModuleFileNameExW,
-        Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ},
-    },
+use windows::Win32::System::{
+    ProcessStatus::K32GetModuleFileNameExW,
+    Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ},
 };
 
+use crate::utils::guards::AutoHandle;
+
 pub fn get_process_path(process_id: u32) -> Result<PathBuf, windows::core::Error> {
-    unsafe {
-        let process_handle = OpenProcess(
+    let process_handle = unsafe {
+        OpenProcess(
             PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
             false,
             process_id,
-        )?;
-        let mut buffer = vec![0u16; 1024];
-        let size = K32GetModuleFileNameExW(Some(HANDLE(process_handle.0)), None, &mut buffer);
-        CloseHandle(process_handle).map_err(|_| {
-            windows::core::Error::new(
-                windows::core::HRESULT(-1),
-                "failed to close process handle.",
-            )
-        })?;
+        )
+    }?;
+    let process_handle = AutoHandle(process_handle);
 
-        if size == 0 {
-            return Err(windows::core::Error::from_thread());
-        }
-
-        buffer.truncate(size as usize);
-        let path = PathBuf::from(OsString::from_wide(&buffer));
-
-        Ok(path)
+    let mut buffer = vec![0u16; 1024];
+    let size = unsafe { K32GetModuleFileNameExW(Some(process_handle.0), None, &mut buffer) };
+    if size == 0 {
+        return Err(windows::core::Error::from_thread());
     }
+
+    buffer.truncate(size as usize);
+
+    Ok(PathBuf::from(OsString::from_wide(&buffer)))
 }

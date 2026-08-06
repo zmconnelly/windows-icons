@@ -1,5 +1,3 @@
-use crate::utils::image_utils::hicon_to_image;
-
 use std::{
     error::Error,
     ffi::OsStr,
@@ -11,7 +9,7 @@ use std::{
 use image::RgbaImage;
 use windows::{
     Win32::{
-        Foundation::{FreeLibrary, HANDLE, HMODULE},
+        Foundation::HANDLE,
         System::LibraryLoader::{GetModuleHandleW, LoadLibraryW},
         UI::{
             Shell::ExtractIconW,
@@ -20,6 +18,9 @@ use windows::{
     },
     core::{HSTRING, PCWSTR},
 };
+
+use crate::utils::guards::AutoModule;
+use crate::utils::image_utils::hicon_to_image;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum DllResource {
@@ -94,19 +95,9 @@ impl DllIcon {
     }
 }
 
-struct AutoModule(HMODULE);
-
-impl Drop for AutoModule {
-    fn drop(&mut self) {
-        if !self.0.0.is_null() {
-            let _ = unsafe { FreeLibrary(self.0) };
-        }
-    }
-}
-
-#[allow(non_snake_case)]
-fn MAKEINTRESOURCEW(id: i32) -> PCWSTR {
-    unsafe { std::mem::transmute::<_, PCWSTR>(id as usize) }
+/// A resource id passed where the Win32 API expects a name, as `MAKEINTRESOURCEW` does.
+fn resource_id_as_name(id: i32) -> PCWSTR {
+    PCWSTR::from_raw(id as u16 as usize as *const u16)
 }
 
 pub fn get_dll_hicon_to_image(dll_icon: DllIcon) -> Result<RgbaImage, Box<dyn Error>> {
@@ -149,10 +140,11 @@ unsafe fn get_dll_hicon(dll_icon: DllIcon) -> Result<HICON, Box<dyn Error>> {
         .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "no dll resources added"))?;
 
     match resource {
-        DllResource::System(s, i) => {
-            let index = i.checked_sub(1).ok_or("index underflow")?;
-            let dll_name = HSTRING::from(s);
+        DllResource::System(dll, index) => {
+            let index = index.checked_sub(1).ok_or("index underflow")?;
+            let dll_name = HSTRING::from(dll);
             let hicon = unsafe { ExtractIconW(None, &dll_name, index) };
+
             if hicon.0.is_null() {
                 let last_error = windows::core::Error::from_thread();
                 Err(Box::new(io::Error::other(format!(
@@ -163,22 +155,21 @@ unsafe fn get_dll_hicon(dll_icon: DllIcon) -> Result<HICON, Box<dyn Error>> {
             }
         }
         DllResource::Other(path, name, size) => {
-            let wide_path: Vec<u16> = OsStr::new(&path).encode_wide().chain(Some(0)).collect();
-            let dll_handle = HSTRING::from_wide(&wide_path);
-            let (w, h) = (size, size);
+            let wide_path: Vec<u16> = OsStr::new(&path).encode_wide().collect();
+            let dll_name = HSTRING::from_wide(&wide_path);
 
-            let hicon_handle = if let Ok(id) = name.trim().parse::<i32>() {
-                let i = MAKEINTRESOURCEW(id.to_owned());
-                unsafe { get_hicon_handle(&dll_handle, i, w, h) }?
-            } else {
-                let name = PCWSTR::from_raw(HSTRING::from(&name).as_ptr());
-                unsafe { get_hicon_handle(&dll_handle, name, w, h) }?
+            // The HSTRING has to outlive the pointer handed to LoadImageW.
+            let resource_name = HSTRING::from(&name);
+            let resource = match name.trim().parse::<i32>() {
+                Ok(id) => resource_id_as_name(id),
+                Err(_) => PCWSTR::from_raw(resource_name.as_ptr()),
             };
 
+            let hicon_handle = unsafe { get_hicon_handle(&dll_name, resource, size, size) }?;
             if hicon_handle.0.is_null() {
                 let last_error = windows::core::Error::from_thread();
                 Err(Box::new(io::Error::other(format!(
-                    "failed to get hIcon from resource: {name} - {last_error}."
+                    "failed to get hIcon from resource: {name} - {last_error}"
                 ))))
             } else {
                 Ok(HICON(hicon_handle.0))

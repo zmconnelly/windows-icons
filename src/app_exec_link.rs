@@ -11,7 +11,6 @@ use std::{
 
 use windows::{
     Win32::{
-        Foundation::{CloseHandle, HANDLE},
         Storage::FileSystem::{
             CreateFileW, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
             FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
@@ -22,7 +21,8 @@ use windows::{
     core::PCWSTR,
 };
 
-/// Reparse tag of the app execution aliases in `%LOCALAPPDATA%\Microsoft\WindowsApps`.
+use crate::utils::guards::AutoHandle;
+
 const IO_REPARSE_TAG_APPEXECLINK: u32 = 0x8000_001B;
 
 /// `MAXIMUM_REPARSE_DATA_BUFFER_SIZE`, the largest payload the file system will return.
@@ -30,16 +30,6 @@ const MAX_REPARSE_DATA_SIZE: usize = 16 * 1024;
 
 /// `REPARSE_DATA_BUFFER` header: tag `u32`, data length `u16`, reserved `u16`.
 const REPARSE_HEADER_SIZE: usize = 8;
-
-struct AutoHandle(HANDLE);
-
-impl Drop for AutoHandle {
-    fn drop(&mut self) {
-        if !self.0.0.is_null() {
-            let _ = unsafe { CloseHandle(self.0) };
-        }
-    }
-}
 
 /// App execution aliases are zero-byte reparse points standing in for an installed UWP
 /// app, so the icon has to come from the package they point at. Any other path is
