@@ -155,10 +155,9 @@ unsafe fn get_dll_hicon(dll_icon: DllIcon) -> Result<HICON, Box<dyn Error>> {
             let hicon = unsafe { ExtractIconW(None, &dll_name, index) };
             if hicon.0.is_null() {
                 let last_error = windows::core::Error::from_win32();
-                Err(Box::new(io::Error::new(
-                    ErrorKind::Other,
-                    format!("failed to extract icon from index - {last_error}"),
-                )))
+                Err(Box::new(io::Error::other(format!(
+                    "failed to extract icon from index - {last_error}"
+                ))))
             } else {
                 Ok(hicon)
             }
@@ -178,10 +177,9 @@ unsafe fn get_dll_hicon(dll_icon: DllIcon) -> Result<HICON, Box<dyn Error>> {
 
             if hicon_handle.0.is_null() {
                 let last_error = windows::core::Error::from_win32();
-                Err(Box::new(io::Error::new(
-                    ErrorKind::Other,
-                    format!("failed to get hIcon from resource: {name} - {last_error}."),
-                )))
+                Err(Box::new(io::Error::other(format!(
+                    "failed to get hIcon from resource: {name} - {last_error}."
+                ))))
             } else {
                 Ok(HICON(hicon_handle.0))
             }

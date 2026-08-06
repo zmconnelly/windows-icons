@@ -2,7 +2,7 @@ use std::{
     error::Error,
     ffi::OsStr,
     fs::File,
-    io::{self, ErrorKind, Read},
+    io::{self, Read},
     mem::{self, MaybeUninit},
     os::windows::ffi::OsStrExt,
     path::Path,
@@ -76,10 +76,9 @@ unsafe fn get_hicon(file_path: &Path) -> Result<HICON, Box<dyn Error>> {
 
     if result == 0 {
         let last_error = windows::core::Error::from_win32();
-        return Err(Box::new(io::Error::new(
-            ErrorKind::Other,
-            format!("failed to get hIcon for the file: {file_path:?}: {last_error}."),
-        )));
+        return Err(Box::new(io::Error::other(format!(
+            "failed to get hIcon for the file: {file_path:?}: {last_error}."
+        ))));
     }
 
     let shfileinfo = unsafe { shfileinfo.assume_init() };
@@ -94,7 +93,7 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
     let mut info = MaybeUninit::uninit();
     unsafe {
         GetIconInfo(icon, info.as_mut_ptr())
-            .map_err(|e| io::Error::new(ErrorKind::Other, format!("GetIconInfo failed: {e}")))
+            .map_err(|e| io::Error::other(format!("GetIconInfo failed: {e}")))
     }?;
     let info = unsafe { info.assume_init() };
 
@@ -111,10 +110,9 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
         )
     };
     if result != bitmap_size_i32 {
-        return Err(Box::new(io::Error::new(
-            ErrorKind::Other,
-            format!("GetObjectW failed, expected {bitmap_size_i32}, got {result}"),
-        )));
+        return Err(Box::new(io::Error::other(format!(
+            "GetObjectW failed, expected {bitmap_size_i32}, got {result}"
+        ))));
     }
     let bitmap = unsafe { bitmap.assume_init() };
 
@@ -126,16 +124,13 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
 
     let buf_size = width_usize
         .checked_mul(height_usize)
-        .ok_or_else(|| io::Error::new(ErrorKind::Other, "Buffer size overflow"))?;
+        .ok_or_else(|| io::Error::other("Buffer size overflow"))?;
 
     let mut buf = vec![0u32; buf_size];
 
     let dc = unsafe { GetDC(None) };
     if dc.0.is_null() {
-        return Err(Box::new(io::Error::new(
-            ErrorKind::Other,
-            "GetDC returned null",
-        )));
+        return Err(Box::new(io::Error::other("GetDC returned null")));
     }
     let _dc_guard = AutoDc(dc);
 
@@ -168,15 +163,13 @@ pub unsafe fn hicon_to_image(icon: HICON) -> Result<RgbaImage, Box<dyn Error>> {
     };
     if result == 0 {
         let last_error = windows::core::Error::from_win32();
-        return Err(Box::new(io::Error::new(
-            ErrorKind::Other,
-            format!("GetDIBits failed: {last_error}."),
-        )));
+        return Err(Box::new(io::Error::other(format!(
+            "GetDIBits failed: {last_error}."
+        ))));
     } else if result != expected_lines {
-        return Err(Box::new(io::Error::new(
-            ErrorKind::Other,
-            format!("GetDIBits failed, expected lines: `{expected_lines}`, got: `{result}`"),
-        )));
+        return Err(Box::new(io::Error::other(format!(
+            "GetDIBits failed, expected lines: `{expected_lines}`, got: `{result}`"
+        ))));
     }
 
     let pixel_data = unsafe {
@@ -203,7 +196,7 @@ fn read_icon_file(icon_path: &Path) -> Result<Vec<u8>, Box<dyn Error>> {
 pub fn icon_file_to_image(icon_path: &Path) -> Result<RgbaImage, Box<dyn Error>> {
     let buffer = read_icon_file(icon_path)?;
     let image = image::load_from_memory(&buffer)
-        .map_err(|e| io::Error::new(ErrorKind::Other, format!("Image decode failed: {e}")))?;
+        .map_err(|e| io::Error::other(format!("Image decode failed: {e}")))?;
     Ok(image.to_rgba8())
 }
 

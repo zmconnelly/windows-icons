@@ -14,10 +14,9 @@ use crate::utils::image_utils::{icon_file_to_base64, icon_file_to_image};
 pub fn get_uwp_icon(file_path: &Path) -> Result<RgbaImage, Box<dyn Error>> {
     let icon_path = get_icon_file_path(file_path)?;
     let rgba_image = icon_file_to_image(&icon_path).map_err(|e| {
-        io::Error::new(
-            ErrorKind::Other,
-            format!("Failed to get icon image for path: '{file_path:?}'\n{e}"),
-        )
+        io::Error::other(format!(
+            "Failed to get icon image for path: '{file_path:?}'\n{e}"
+        ))
     })?;
     Ok(rgba_image)
 }
@@ -25,10 +24,9 @@ pub fn get_uwp_icon(file_path: &Path) -> Result<RgbaImage, Box<dyn Error>> {
 pub fn get_uwp_icon_base64(file_path: &Path) -> Result<String, Box<dyn Error>> {
     let icon_path = get_icon_file_path(file_path)?;
     let base64 = icon_file_to_base64(&icon_path).map_err(|e| {
-        io::Error::new(
-            ErrorKind::Other,
-            format!("Failed to get icon base64 for path: '{file_path:?}'\n{e}"),
-        )
+        io::Error::other(format!(
+            "Failed to get icon base64 for path: '{file_path:?}'\n{e}"
+        ))
     })?;
     Ok(base64)
 }
@@ -49,9 +47,8 @@ fn get_icon_file_path(app_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
     })?;
     let manifest_path = package_folder.join("AppxManifest.xml");
     if manifest_path.exists() {
-        let manifest_content = fs::read_to_string(&manifest_path).map_err(|_| {
-            io::Error::new(ErrorKind::Other, "could not to read the AppxManifest.xml.")
-        })?;
+        let manifest_content = fs::read_to_string(&manifest_path)
+            .map_err(|_| io::Error::other("could not to read the AppxManifest.xml."))?;
 
         let icon_path = extract_icon_path(&manifest_content)?;
         let icon_full_path = package_folder.join(icon_path);
@@ -62,10 +59,9 @@ fn get_icon_file_path(app_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
         }
     } else {
         fuzzy_get_icon_file_path(package_folder).map_err(|e| {
-            Box::new(io::Error::new(
-                ErrorKind::Other,
-                format!("AppxManifest.xml does not exist and {e}"),
-            )) as Box<dyn Error>
+            Box::new(io::Error::other(format!(
+                "AppxManifest.xml does not exist and {e}"
+            ))) as Box<dyn Error>
         })
     }
 }
@@ -75,12 +71,12 @@ fn extract_icon_path(manifest_content: &str) -> Result<String, Box<dyn Error>> {
     let start_tag = "<Logo>";
     let end_tag = "</Logo>";
 
-    if let Some(start) = manifest_content.find(start_tag) {
-        if let Some(end) = manifest_content.find(end_tag) {
-            let start_pos = start + start_tag.len();
-            let icon_path = &manifest_content[start_pos..end];
-            return Ok(icon_path.trim().to_string());
-        }
+    if let Some(start) = manifest_content.find(start_tag)
+        && let Some(end) = manifest_content.find(end_tag)
+    {
+        let start_pos = start + start_tag.len();
+        let icon_path = &manifest_content[start_pos..end];
+        return Ok(icon_path.trim().to_string());
     }
 
     Err(Box::new(io::Error::new(
