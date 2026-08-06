@@ -2,9 +2,11 @@ mod utils {
     pub mod image_utils;
     pub mod process_utils;
 }
+mod app_exec_link;
 mod dll_icons;
 mod uwp_apps;
 
+use app_exec_link::resolve_app_exec_link;
 pub use dll_icons::DllIcon;
 use dll_icons::get_dll_hicon_to_image;
 use utils::image_utils::{get_hicon_to_image, image_to_base64};
@@ -21,7 +23,8 @@ use image::RgbaImage;
 ///
 /// Requiring a package folder below `WindowsApps` keeps the app execution aliases in
 /// `%LOCALAPPDATA%\Microsoft\WindowsApps` out, since those sit directly in that folder
-/// and carry no package manifest.
+/// and carry no package manifest. Callers resolve those to their target package first,
+/// so only an alias that could not be resolved reaches this check.
 fn is_uwp_app(path: &Path) -> bool {
     let path = path.to_string_lossy();
 
@@ -40,7 +43,9 @@ fn is_uwp_app(path: &Path) -> bool {
 }
 
 pub fn get_icon_by_path<P: AsRef<Path>>(path: P) -> Result<RgbaImage, Box<dyn Error>> {
-    let path = path.as_ref();
+    let resolved = resolve_app_exec_link(path.as_ref());
+    let path = &*resolved;
+
     if is_uwp_app(path) {
         get_uwp_icon(path)
     } else {
@@ -49,11 +54,13 @@ pub fn get_icon_by_path<P: AsRef<Path>>(path: P) -> Result<RgbaImage, Box<dyn Er
 }
 
 pub fn get_icon_base64_by_path<P: AsRef<Path>>(path: P) -> Result<String, Box<dyn Error>> {
-    let path = path.as_ref();
+    let resolved = resolve_app_exec_link(path.as_ref());
+    let path = &*resolved;
+
     if is_uwp_app(path) {
         get_uwp_icon_base64(path)
     } else {
-        let icon_image = get_icon_by_path(path)?;
+        let icon_image = get_hicon_to_image(path)?;
         image_to_base64(icon_image)
     }
 }
