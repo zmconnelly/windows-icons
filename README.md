@@ -5,6 +5,7 @@ A simple Rust library to extract icons from files and running processes on Windo
 ## Features
 
 - Retrieve icons by file path or process id
+- Request Explorer-aligned sizes (`Small` 16, `Medium` 48, `Large` 96, `ExtraLarge` 256)
 - Save as a PNG or base64 encoded string
 
 ## Installation
@@ -19,9 +20,18 @@ windows-icons = "0.3"
 ## Usage
 
 ```rust
+use windows_icons::{get_icon_by_path, get_icon_by_path_with_size, IconSize};
+
 // Get icon as an image from a file path
 let icon = get_icon_by_path("C:\\Windows\\System32\\notepad.exe").unwrap();
 icon.save("notepad.png").unwrap();
+
+// Get icon at an Explorer-aligned size
+let icon = get_icon_by_path_with_size(
+    "C:\\Windows\\System32\\notepad.exe",
+    IconSize::Large,
+).unwrap();
+icon.save("notepad_large.png").unwrap();
 
 // Get icon as a base64 string from a file path
 let base64 = get_icon_base64_by_path("C:\\Windows\\System32\\calc.exe").unwrap();

@@ -8,7 +8,8 @@ use std::{
 use glob::glob;
 use image::RgbaImage;
 
-use crate::utils::image_utils::{icon_file_to_base64, icon_file_to_image};
+use crate::icon_size::IconSize;
+use crate::utils::image_utils::{icon_file_to_base64, icon_file_to_image, resize_rgba_image};
 
 /// UWP apps are installed to `<Program Files>\WindowsApps\<package folder>\...`, and the
 /// `Program Files` segment is localized (`Programme` on German Windows, and so on), so
@@ -37,6 +38,16 @@ pub fn get_uwp_icon(file_path: &Path) -> Result<RgbaImage, Box<dyn Error>> {
     })?;
 
     Ok(rgba_image)
+}
+
+/// Decode the UWP logo and fit it into a `size.pixels()` square, preserving
+/// aspect ratio (letterboxed on a transparent canvas when not square).
+pub fn get_uwp_icon_with_size(
+    file_path: &Path,
+    size: IconSize,
+) -> Result<RgbaImage, Box<dyn Error>> {
+    let rgba_image = get_uwp_icon(file_path)?;
+    Ok(resize_rgba_image(rgba_image, size.pixels()))
 }
 
 pub fn get_uwp_icon_base64(file_path: &Path) -> Result<String, Box<dyn Error>> {
